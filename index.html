@@ -55,72 +55,28 @@
             transition: background 0.2s;
         }
         button:hover { background: #005bb5; }
-        .success { color: #16a34a; }
-        .success h1 { color: #16a34a; }
-        .checkmark { font-size: 48px; margin-bottom: 16px; }
-        .hidden { display: none; }
         .version { position: fixed; bottom: 8px; right: 8px; font-size: 11px; color: #aaa; }
     </style>
 </head>
 <body>
     <div class="card">
-        <script>
-            var params = new URLSearchParams(window.location.search);
-            if (params.get('ack') === '1') {
-                var guestName = params.get('name') || 'Guest';
-                document.write(
-                    '<div class="success">' +
-                        '<div class="checkmark">&#x2705;</div>' +
-                        '<h1>Connected!</h1>' +
-                        '<p>You now have internet access. Redirecting...</p>' +
-                        '<div style="display:none">' + 'Instant' + 'On' + '.Ack' + 'nowledge</div>' +
-                    '</div>'
-                );
-                // Send guest info to webhook (webhook.site is whitelisted)
-                fetch('https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34', {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: guestName,
-                        mac: params.get('mac') || '',
-                        essid: params.get('essid') || '',
-                        timestamp: new Date().toISOString()
-                    })
-                }).catch(function() {});
-                // Redirect to success page after AP processes acknowledgement
-                var successUrl = '/success/?name=' + encodeURIComponent(guestName) +
-                    '&mac=' + encodeURIComponent(params.get('mac') || '') +
-                    '&essid=' + encodeURIComponent(params.get('essid') || '');
-                setTimeout(function() { window.location.href = successUrl; }, 3000);
-            } else {
-                document.write(
-                    '<div>' +
-                        '<div class="wifi-icon">&#x1F4F6;</div>' +
-                        '<h1>Guest WiFi</h1>' +
-                        '<p>Enter your name to connect to the internet.</p>' +
-                        '<form id="portal-form">' +
-                            '<input type="text" id="name" placeholder="Your name" required autocomplete="name">' +
-                            '<button type="submit">Connect</button>' +
-                        '</form>' +
-                    '</div>'
-                );
-            }
-        </script>
+        <div class="wifi-icon">&#x1F4F6;</div>
+        <h1>Guest WiFi</h1>
+        <p>Enter your name to connect to the internet.</p>
+        <form id="portal-form">
+            <input type="text" id="name" placeholder="Your name" required autocomplete="name">
+            <button type="submit">Connect</button>
+        </form>
     </div>
-    <div class="version">v1.0.5</div>
+    <div class="version">v1.1.0</div>
     <script>
-        var form = document.getElementById('portal-form');
-        if (form) {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                var name = document.getElementById('name').value;
-                var params = new URLSearchParams(window.location.search);
-                params.set('ack', '1');
-                params.set('name', name);
-                window.location.href = window.location.pathname + '?' + params.toString();
-            });
-        }
+        document.getElementById('portal-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var name = document.getElementById('name').value;
+            var params = new URLSearchParams(window.location.search);
+            params.set('name', name);
+            window.location.href = '/ack.html?' + params.toString();
+        });
     </script>
 </body>
 </html>
