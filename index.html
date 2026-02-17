@@ -71,7 +71,7 @@ terms.addEventListener("change", () => {
   btn.disabled = !terms.checked;
 });
 
-btn.addEventListener("click", async () => {
+btn.addEventListener("click", () => {
 
   const name = document.getElementById("name").value;
   const email = document.getElementById("email").value;
@@ -81,19 +81,15 @@ btn.addEventListener("click", async () => {
     return;
   }
 
-  // 1️⃣ Call webhook
-  await fetch("https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      name,
-      email,
-      client_mac: clientMac,
-      login_time: new Date().toISOString()
-    })
-  });
+  const data = {
+    name,
+    email,
+    client_mac: clientMac,
+    login_time: new Date().toISOString()
+  };
+  console.log(data);
 
-  // 2️⃣ Redirect to Aruba to unlock internet
+  // Redirect to Aruba to unlock internet
   window.location.href = baseGrantUrl + "&continue_url=" + encodeURIComponent(redirectUrl);
 });
 
