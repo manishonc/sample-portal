@@ -6,8 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 body {
-  margin:0;
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   background:#f5f5f5;
   display:flex;
   justify-content:center;
@@ -21,46 +20,25 @@ body {
   width:350px;
   box-shadow:0 5px 20px rgba(0,0,0,0.1);
 }
-input {
-  width:100%;
-  padding:10px;
-  margin:8px 0;
-}
-button {
-  width:100%;
-  padding:12px;
-  background:#5c0f8b;
-  color:white;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-}
-button:disabled {
-  opacity:0.5;
-  cursor:not-allowed;
-}
+input { width:100%; padding:10px; margin:8px 0; }
+button { width:100%; padding:12px; background:#5c0f8b; color:white; border:none; border-radius:6px; }
+button:disabled { opacity:0.5; }
 </style>
 </head>
-
 <body>
+
 <div class="card">
   <h2>Connect to Free WiFi</h2>
 
-  <form id="wifiForm" method="POST">
-    <input type="text" name="fullname" placeholder="Full Name" required>
-    <input type="email" name="email" placeholder="Email Address" required>
+  <input type="text" id="name" placeholder="Full Name" required>
+  <input type="email" id="email" placeholder="Email Address" required>
 
-    <label>
-      <input type="checkbox" id="terms">
-      I agree to Terms & Conditions
-    </label>
+  <label>
+    <input type="checkbox" id="terms">
+    I agree to Terms & Conditions
+  </label>
 
-    <!-- Aruba Required Fields -->
-    <input type="hidden" name="opcode" value="cp_ack">
-    <input type="hidden" name="orig_url" id="orig_url">
-
-    <button id="connectBtn" type="submit" disabled>Connect</button>
-  </form>
+  <button id="connectBtn" disabled>Connect</button>
 </div>
 
 <script>
@@ -68,22 +46,31 @@ function getParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-var origUrl = getParam("orig_url");
-if (origUrl) {
-  document.getElementById("orig_url").value = origUrl;
-}
+var redirectUrl = getParam("redirect_url");
 
-var terms = document.getElementById("terms");
 var btn = document.getElementById("connectBtn");
+var terms = document.getElementById("terms");
 
 terms.addEventListener("change", function() {
   btn.disabled = !terms.checked;
 });
 
-// IMPORTANT:
-// Submit back to Aruba gateway, not your server
-document.getElementById("wifiForm").action =
-  window.location.protocol + "//" + window.location.host + "/swarm.cgi";
+btn.addEventListener("click", function() {
+
+  var name = document.getElementById("name").value;
+  var email = document.getElementById("email").value;
+
+  if (!name || !email) {
+    alert("Please fill all fields");
+    return;
+  }
+
+  if (redirectUrl) {
+    window.location.href = redirectUrl;
+  } else {
+    alert("Missing redirect URL");
+  }
+});
 </script>
 
 </body>
