@@ -7,77 +7,102 @@
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; background-color: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
         .container { background: white; width: 100%; max-width: 400px; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
-        button { width: 95%; background-color: #5c0f8b; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { width: 95%; background-color: #5c0f8b; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
         button:hover { background-color: #4a0c70; }
-        .disclaimer { font-size: 12px; color: #777; margin-top: 15px; }
+        #status { margin-top: 15px; color: #666; font-size: 13px; min-height: 20px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>Welcome</h2>
-        <p>Enter your details to connect.</p>
+        <h2>WiFi Login</h2>
+        <p>Please enter your details.</p>
         
         <input type="text" id="name" placeholder="Full Name" required>
         <input type="email" id="email" placeholder="Email Address" required>
         
-        <button id="connectBtn" onclick="connect()">Connect & Login</button>
-        <p class="disclaimer">By connecting, you agree to our Terms of Service.</p>
+        <button id="connectBtn" onclick="processLogin()">Connect Internet</button>
+        <div id="status"></div>
     </div>
 
     <form id="authForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
-        <input type="hidden" id="orig_url" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
         <input type="hidden" name="opcode" value="cp_ack">
+        <input type="hidden" id="orig_url" name="orig_url" value="">
     </form>
 
     <script>
-        // 1. Get the 'orig_url' from the address bar exactly as Aruba sent it
-        // We do NOT decode it, because Aruba sometimes expects the raw Hex string back.
-        function getParameterByName(name) {
-            var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
-            return match && match[1];
+        // --- CONFIGURATION ---
+        const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
+        // Default fallback (Google Check in HEX) if we can't find a real URL
+        const DEFAULT_HEX_URL = "687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034";
+
+        // --- HELPER: Convert Text to Hex ---
+        // Aruba often requires the redirect URL to be encoded in Hex
+        function stringToHex(str) {
+            let hex = '';
+            for(let i = 0; i < str.length; i++) {
+                hex += '' + str.charCodeAt(i).toString(16);
+            }
+            return hex;
         }
 
-        const urlParam = getParameterByName('orig_url');
-        if (urlParam) {
-            document.getElementById('orig_url').value = urlParam;
+        // --- HELPER: Get URL Parameters ---
+        // External portals often use 'url', 'original_url', or 'orig_url'
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
         }
 
-        function connect() {
+        // --- MAIN LOGIC ---
+        function processLogin() {
             const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
+            const statusDiv = document.getElementById('status');
+            const btn = document.getElementById('connectBtn');
 
             if (!name || !email) {
-                alert("Please enter both Name and Email.");
+                alert("Please fill in all fields.");
                 return;
             }
 
-            // 2. Change Button Text
-            document.getElementById('connectBtn').innerText = "Connecting...";
-            document.getElementById('connectBtn').disabled = true;
+            // 1. UI Updates
+            btn.disabled = true;
+            btn.innerText = "Authenticating...";
+            statusDiv.innerText = "Sending data...";
 
-            // 3. Prepare Data
-            const data = JSON.stringify({
-                name: name,
-                email: email,
-                time: new Date().toISOString()
-            });
+            // 2. Prepare the Redirect URL (The 'Magic' Fix)
+            const rawUrl = getQueryParam('url') || getQueryParam('orig_url') || getQueryParam('original_url');
+            const authInput = document.getElementById('orig_url');
 
-            // 4. FIRE AND FORGET (navigator.sendBeacon)
-            // This sends data in the background without waiting for a response.
-            // This prevents the "White Screen" if the webhook is blocked or slow.
-            const webhookUrl = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
-            
-            // Try sendBeacon first (best for closing pages), fallback to fetch if needed
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(webhookUrl, data);
+            if (rawUrl) {
+                // If it looks like http... convert to Hex
+                if (rawUrl.startsWith('http')) {
+                    console.log("Converting URL to Hex...");
+                    authInput.value = stringToHex(rawUrl);
+                } else {
+                    // It's probably already Hex or weird, leave it
+                    authInput.value = rawUrl;
+                }
             } else {
-                fetch(webhookUrl, { method: 'POST', body: data, mode: 'no-cors' });
+                // Fallback to the default Hex string
+                authInput.value = DEFAULT_HEX_URL;
             }
 
-            // 5. Submit form immediately. Do not wait.
-            document.getElementById('authForm').submit();
+            // 3. Send Webhook (Fire and Forget)
+            const userData = JSON.stringify({ name: name, email: email, timestamp: new Date().toISOString() });
+            
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(WEBHOOK_URL, userData);
+            } else {
+                fetch(WEBHOOK_URL, { method: 'POST', body: userData, mode: 'no-cors' });
+            }
+
+            // 4. Submit to Aruba (Small delay to ensure browser processes Beacon)
+            statusDiv.innerText = "Connecting to WiFi...";
+            setTimeout(() => {
+                document.getElementById('authForm').submit();
+            }, 300);
         }
     </script>
 </body>
