@@ -5,104 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest WiFi Access</title>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #f4f6f8; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0;
-        }
-        .container { 
-            background: white; 
-            width: 90%; 
-            max-width: 400px; 
-            padding: 30px; 
-            border-radius: 12px; 
-            text-align: center; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-        }
-        input { 
-            width: 100%; 
-            padding: 12px; 
-            margin: 8px 0; 
-            border: 1px solid #ddd; 
-            border-radius: 6px; 
-            box-sizing: border-box; 
-        }
-        button { 
-            width: 100%; 
-            padding: 14px; 
-            background-color: #5c0f8b; 
-            color: white; 
-            border: none; 
-            border-radius: 6px; 
-            font-size: 16px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            margin-top: 15px; 
-        }
-        button:disabled { background-color: #ccc; }
-        .error-msg { color: red; font-size: 12px; margin-top: 10px; display: none; }
-        .debug-info { font-size: 10px; color: #aaa; margin-top: 20px; display: none; text-align: left; }
+        body { margin: 0; padding: 0; font-family: sans-serif; background-color: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .container { background: white; width: 100%; max-width: 360px; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        h2 { margin-bottom: 10px; color: #333; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; background-color: #5c0f8b; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 15px; }
+        button:hover { background-color: #400a61; }
+        #debug { margin-top: 20px; font-size: 11px; color: #888; text-align: left; background: #eee; padding: 5px; border-radius: 4px; word-break: break-all; display: none; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h2>WiFi Login</h2>
-        <p>Please sign in to continue.</p>
-        
         <input type="text" id="name" placeholder="Full Name" required>
         <input type="email" id="email" placeholder="Email Address" required>
         
-        <button id="connectBtn" onclick="handleLogin()">Connect to Internet</button>
-        <p id="error" class="error-msg">Missing configuration parameters.</p>
+        <button id="connectBtn" onclick="handleLogin()">Connect</button>
         
-        <div id="debug" class="debug-info"></div>
+        <div id="debug"></div>
     </div>
 
-    <form id="authForm" method="POST">
+    <form id="authForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
         <input type="hidden" name="opcode" value="cp_ack">
-        <input type="hidden" id="auth_orig_url" name="orig_url" value="">
+        <input type="hidden" id="orig_url" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
     </form>
 
     <script>
         const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
 
-        // Global variable to store the AP's login URL
-        let apLoginUrl = "";
-
-        // 1. ON LOAD: Capture the parameters sent by the AP
+        // 1. SETUP: Check URL for parameters, otherwise use defaults
         document.addEventListener("DOMContentLoaded", function() {
             const params = new URLSearchParams(window.location.search);
+            const form = document.getElementById('authForm');
+            const origUrlInput = document.getElementById('orig_url');
             const debug = document.getElementById('debug');
-            
-            // A. Get the 'switch_url' (Where we submit the form)
-            // Aruba usually sends 'switch_url', but sometimes 'login_url'
-            apLoginUrl = params.get('switch_url') || params.get('login_url');
-            
-            // B. Get the 'orig_url' (Where the user wanted to go)
-            // Aruba sends this so we can redirect them back after login
-            const origUrl = params.get('orig_url') || params.get('url') || params.get('redirect');
 
-            // C. Populate the hidden form
-            if (apLoginUrl) {
-                // Ensure the URL is decoded properly
-                document.getElementById('authForm').action = decodeURIComponent(apLoginUrl);
+            // Debug: Show the full URL we are currently on
+            debug.innerText = "Current URL: " + window.location.href;
+
+            // A. CHECK FOR 'switch_url' (The AP Login Server)
+            const switchUrl = params.get('switch_url') || params.get('login_url');
+            if (switchUrl) {
+                form.action = decodeURIComponent(switchUrl);
+                debug.innerHTML += "<br><strong>FOUND SWITCH URL:</strong> " + form.action;
             } else {
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('connectBtn').disabled = true;
-                debug.innerHTML += "ERROR: No switch_url found in address bar.<br>";
+                debug.innerHTML += "<br><strong>USING FALLBACK URL:</strong> " + form.action;
             }
 
+            // B. CHECK FOR 'orig_url' (The user's destination)
+            const origUrl = params.get('orig_url') || params.get('url') || params.get('redirect');
             if (origUrl) {
-                document.getElementById('auth_orig_url').value = origUrl;
+                origUrlInput.value = origUrl;
             }
-
-            // DEBUGGING: Show what we received (Remove 'display:none' from CSS to see this)
-            debug.innerHTML += `<b>AP URL:</b> ${apLoginUrl}<br><b>Orig URL:</b> ${origUrl}`;
         });
 
         function handleLogin() {
@@ -111,38 +66,39 @@
             const btn = document.getElementById('connectBtn');
 
             if (!name || !email) {
-                alert("Please fill in all fields");
+                alert("Please fill in all fields.");
                 return;
             }
 
             btn.disabled = true;
             btn.innerText = "Authenticating...";
 
-            // 2. Send Data to Webhook (Background)
-            const payload = JSON.stringify({
+            // 2. SEND DATA TO WEBHOOK
+            const userData = JSON.stringify({
                 name: name,
                 email: email,
                 timestamp: new Date().toISOString()
             });
 
+            // Try sendBeacon first (best for closing pages), fallback to fetch
             if (navigator.sendBeacon) {
-                navigator.sendBeacon(WEBHOOK_URL, payload);
+                navigator.sendBeacon(WEBHOOK_URL, userData);
+                submitForm();
             } else {
                 fetch(WEBHOOK_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    body: payload
+                    body: userData,
+                    mode: 'no-cors'
+                }).finally(() => {
+                    submitForm();
                 });
             }
+        }
 
-            // 3. Submit to Aruba AP
-            // We wait 500ms to ensure the webhook has time to leave the browser
+        function submitForm() {
+            // 3. SUBMIT TO ARUBA
             setTimeout(() => {
-                if(apLoginUrl) {
-                    document.getElementById('authForm').submit();
-                } else {
-                    alert("Error: Cannot connect. The WiFi system did not provide a login URL.");
-                }
+                document.getElementById('authForm').submit();
             }, 500);
         }
     </script>
