@@ -66,19 +66,29 @@
         <script>
             var params = new URLSearchParams(window.location.search);
             if (params.get('ack') === '1') {
+                var guestName = params.get('name') || 'Guest';
                 document.write(
                     '<div class="success">' +
                         '<div class="checkmark">&#x2705;</div>' +
                         '<h1>Connected!</h1>' +
-                        '<p>You now have internet access. Enjoy!</p>' +
+                        '<p>You now have internet access. Redirecting...</p>' +
                         '<div style="display:none">InstantOn.Acknowledge</div>' +
                     '</div>'
                 );
-                var redirectUrl = params.get('url');
-                if (redirectUrl) {
-                    document.write('<p style="font-size:14px;color:#666;">Redirecting...</p>');
-                    setTimeout(function() { window.location.href = redirectUrl; }, 3000);
-                }
+                // Send name to webhook
+                fetch('https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: guestName,
+                        mac: params.get('mac') || '',
+                        essid: params.get('essid') || '',
+                        timestamp: new Date().toISOString()
+                    })
+                }).catch(function() {});
+                // Redirect to success page
+                var successUrl = window.location.pathname.replace('index.html', '') + 'success.html?name=' + encodeURIComponent(guestName);
+                setTimeout(function() { window.location.href = successUrl; }, 3000);
             } else {
                 document.write(
                     '<div>' +
@@ -99,8 +109,10 @@
         if (form) {
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                var name = document.getElementById('name').value;
                 var params = new URLSearchParams(window.location.search);
                 params.set('ack', '1');
+                params.set('name', name);
                 window.location.href = window.location.pathname + '?' + params.toString();
             });
         }
