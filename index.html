@@ -75,7 +75,7 @@
                         '<div style="display:none">InstantOn.Acknowledge</div>' +
                     '</div>'
                 );
-                // Send name to webhook
+                // Send guest info to webhook (webhook.site is whitelisted)
                 fetch('https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -86,8 +86,10 @@
                         timestamp: new Date().toISOString()
                     })
                 }).catch(function() {});
-                // Redirect to success page
-                var successUrl = window.location.pathname.replace('index.html', '') + 'success.html?name=' + encodeURIComponent(guestName);
+                // Redirect to success page after AP processes acknowledgement
+                var successUrl = '/success.html?name=' + encodeURIComponent(guestName) +
+                    '&mac=' + encodeURIComponent(params.get('mac') || '') +
+                    '&essid=' + encodeURIComponent(params.get('essid') || '');
                 setTimeout(function() { window.location.href = successUrl; }, 3000);
             } else {
                 document.write(
