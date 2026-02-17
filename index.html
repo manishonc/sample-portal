@@ -5,34 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest WiFi</title>
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        body { margin: 0; padding: 0; font-family: sans-serif; background: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
         .container { background: white; width: 90%; max-width: 360px; padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h2 { margin-bottom: 10px; color: #333; }
+        p { color: #666; font-size: 14px; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        
+        /* The Main Connect Button */
         button { width: 100%; padding: 14px; background: #5c0f8b; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
         button:disabled { background: #ccc; }
-        #status { margin-top: 15px; font-size: 12px; color: #666; }
+        
+        /* The Manual 'Fix It' Button (Hidden by default) */
+        #manualBtn { display: none; background: #28a745; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h2>WiFi Login</h2>
+        <p>Please enter your details.</p>
+        
         <input type="text" id="name" placeholder="Full Name" required>
         <input type="email" id="email" placeholder="Email Address" required>
-        <button id="connectBtn" onclick="processLogin()">Connect</button>
-        <div id="status"></div>
+        
+        <button id="connectBtn" onclick="startLogin()">Connect Internet</button>
+        
+        <form id="manualForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
+            <input type="hidden" name="opcode" value="cp_ack">
+            <input type="hidden" name="ack_redirect" value="1"> <input type="hidden" name="ack_mode" value="1">    <input type="hidden" id="manual_orig_url" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
+            <button id="manualBtn" type="submit">Click here to Finish</button>
+        </form>
+        
+        <div id="status" style="margin-top:15px; font-size:12px; color:#888;"></div>
     </div>
 
-    <input type="hidden" id="fallback_url" value="http://captive-2022.aio.cloudauth.net/swarm.cgi">
-    <input type="hidden" id="fallback_orig" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
-
     <script>
-        function processLogin() {
+        const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
+
+        function startLogin() {
             const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
             const btn = document.getElementById('connectBtn');
             const status = document.getElementById('status');
+            const manualBtn = document.getElementById('manualBtn');
 
             if (!name || !email) {
                 alert("Please fill in all fields");
@@ -41,75 +56,52 @@
 
             // 1. Lock UI
             btn.disabled = true;
-            btn.innerText = "Connecting...";
-            status.innerText = "Registering device...";
+            btn.innerText = "Authenticating...";
+            status.innerText = "Sending data...";
 
-            // 2. Prepare Webhook Data
-            const webhookUrl = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
-            const payload = JSON.stringify({
-                name: name,
-                email: email,
-                timestamp: new Date().toISOString()
-            });
-
-            // 3. Send Webhook (Fire & Forget via sendBeacon)
-            // We do NOT wait for a response. Waiting causes the white screen.
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(webhookUrl, payload);
-            } else {
-                fetch(webhookUrl, { method: 'POST', mode: 'no-cors', body: payload });
-            }
-
-            // 4. FORCE SUBMIT TO ARUBA (After 500ms delay)
-            // This delay is critical to let the browser process the beacon before navigating away.
-            setTimeout(submitToAruba, 500);
-        }
-
-        function submitToAruba() {
-            const params = new URLSearchParams(window.location.search);
-            const status = document.getElementById('status');
+            // 2. Send Webhook (Fire and Forget)
+            const payload = JSON.stringify({ name: name, email: email, timestamp: new Date().toISOString() });
             
-            status.innerText = "Authenticating with WiFi...";
-
-            // GET THE CORRECT URL
-            // Priority 1: URL from AP (switch_url)
-            // Priority 2: Hardcoded Fallback
-            let actionUrl = params.get('switch_url') || params.get('login_url');
-            if (!actionUrl) {
-                actionUrl = document.getElementById('fallback_url').value;
+            // Use sendBeacon if available (it's faster and doesn't block)
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(WEBHOOK_URL, payload);
             } else {
-                actionUrl = decodeURIComponent(actionUrl);
+                fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: payload });
             }
 
-            // GET THE DESTINATION
-            let origUrl = params.get('orig_url') || params.get('url') || params.get('redirect');
-            if (!origUrl) {
-                origUrl = document.getElementById('fallback_orig').value;
-            }
-
-            // CREATE FORM DYNAMICALLY (To ensure clean submission)
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = actionUrl;
-
-            // Add 'opcode' (Required by Aruba)
-            const opcodeField = document.createElement('input');
-            opcodeField.type = 'hidden';
-            opcodeField.name = 'opcode';
-            opcodeField.value = 'cp_ack';
-            form.appendChild(opcodeField);
-
-            // Add 'orig_url' (Required by Aruba)
-            const origField = document.createElement('input');
-            origField.type = 'hidden';
-            origField.name = 'orig_url';
-            origField.value = origUrl;
-            form.appendChild(origField);
-
-            // Submit
-            document.body.appendChild(form);
-            form.submit();
+            // 3. SUBMIT TO ARUBA
+            // We wait 1 second to ensure the Webhook fired, then we submit the form.
+            status.innerText = "Connecting to WiFi...";
+            setTimeout(() => {
+                // Try to auto-submit
+                document.getElementById('manualForm').submit();
+                
+                // If the screen stays white or doesn't move after 2 seconds, show the manual button
+                setTimeout(() => {
+                    btn.style.display = 'none';
+                    manualBtn.style.display = 'block';
+                    status.innerText = "If nothing happens, click the green button above.";
+                }, 2000);
+            }, 800);
         }
+
+        // Setup the Form URL dynamically on load
+        document.addEventListener("DOMContentLoaded", function() {
+            const params = new URLSearchParams(window.location.search);
+            const form = document.getElementById('manualForm');
+            
+            // Get the Switch URL from the AP (or use the default one you gave me)
+            const switchUrl = params.get('switch_url') || params.get('login_url');
+            if (switchUrl) {
+                form.action = decodeURIComponent(switchUrl);
+            }
+
+            // Get the Original URL (Destination)
+            const origUrl = params.get('orig_url') || params.get('url');
+            if (origUrl) {
+                document.getElementById('manual_orig_url').value = origUrl;
+            }
+        });
     </script>
 </body>
 </html>
