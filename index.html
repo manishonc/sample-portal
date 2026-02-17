@@ -78,6 +78,7 @@
                 // Send guest info to webhook (webhook.site is whitelisted)
                 fetch('https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34', {
                     method: 'POST',
+                    mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: guestName,
@@ -87,7 +88,7 @@
                     })
                 }).catch(function() {});
                 // Redirect to success page after AP processes acknowledgement
-                var successUrl = '/success.html?name=' + encodeURIComponent(guestName) +
+                var successUrl = '/success/?name=' + encodeURIComponent(guestName) +
                     '&mac=' + encodeURIComponent(params.get('mac') || '') +
                     '&essid=' + encodeURIComponent(params.get('essid') || '');
                 setTimeout(function() { window.location.href = successUrl; }, 3000);
