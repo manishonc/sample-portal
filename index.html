@@ -5,197 +5,79 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest WiFi Access</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f6f8;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-        .container {
-            background: white;
-            width: 100%;
-            max-width: 400px;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-            box-sizing: border-box;
-            margin: 20px;
-        }
-        h1 {
-            color: #333;
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-        p {
-            color: #666;
-            margin-bottom: 24px;
-            font-size: 14px;
-        }
-        .input-group {
-            margin-bottom: 16px;
-            text-align: left;
-        }
-        label {
-            display: block;
-            margin-bottom: 6px;
-            color: #333;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        input[type="text"], input[type="email"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-            box-sizing: border-box;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        input[type="text"]:focus, input[type="email"]:focus {
-            border-color: #5c0f8b;
-        }
-        button {
-            width: 100%;
-            background-color: #5c0f8b;
-            color: white;
-            border: none;
-            padding: 14px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            margin-top: 10px;
-        }
-        button:hover {
-            background-color: #4a0c70;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .spinner {
-            display: none;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-            margin: 0 auto;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        body { margin: 0; padding: 0; font-family: sans-serif; background-color: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .container { background: white; width: 100%; max-width: 400px; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
+        button { width: 95%; background-color: #5c0f8b; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #4a0c70; }
+        .disclaimer { font-size: 12px; color: #777; margin-top: 15px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Welcome Guest</h1>
-        <p>Please enter your details to connect to the WiFi.</p>
-
-        <div id="userForm">
-            <div class="input-group">
-                <label for="name">Full Name</label>
-                <input type="text" id="name" placeholder="John Doe" required>
-            </div>
-            <div class="input-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" placeholder="john@example.com" required>
-            </div>
-            <button id="connectBtn" onclick="handleConnect()">
-                <span id="btnText">Connect to WiFi</span>
-                <div class="spinner" id="btnSpinner"></div>
-            </button>
-        </div>
-
-        <form id="authForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
-            <input type="hidden" name="orig_url" id="orig_url">
-            <input type="hidden" name="opcode" value="cp_ack">
-            <input type="hidden" name="ack_redirect" value="1"> </form>
+        <h2>Welcome</h2>
+        <p>Enter your details to connect.</p>
+        
+        <input type="text" id="name" placeholder="Full Name" required>
+        <input type="email" id="email" placeholder="Email Address" required>
+        
+        <button id="connectBtn" onclick="connect()">Connect & Login</button>
+        <p class="disclaimer">By connecting, you agree to our Terms of Service.</p>
     </div>
 
-    <script>
-        // 1. Setup the Webhook URL
-        const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
+    <form id="authForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
+        <input type="hidden" id="orig_url" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
+        <input type="hidden" name="opcode" value="cp_ack">
+    </form>
 
-        // 2. Parse URL Parameters from the address bar
-        // When Aruba redirects here, it includes 'orig_url' in the query string
+    <script>
+        // 1. Get the 'orig_url' from the address bar exactly as Aruba sent it
+        // We do NOT decode it, because Aruba sometimes expects the raw Hex string back.
         function getParameterByName(name) {
-            const url = window.location.href;
-            name = name.replace(/[\[\]]/g, '\\$&');
-            const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-            const results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, ' '));
+            var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+            return match && match[1];
         }
 
-        // 3. Populate the hidden field required by Aruba
-        document.addEventListener("DOMContentLoaded", function() {
-            const origUrlInput = document.getElementById("orig_url");
-            // Try to get orig_url from URL, fallback to the google check url if missing
-            const origUrlQuery = getParameterByName("orig_url");
-            
-            if (origUrlQuery) {
-                origUrlInput.value = origUrlQuery;
-            } else {
-                // Default fallback if parameter is lost, ensures connectivity check passes
-                origUrlInput.value = "http://connectivitycheck.gstatic.com/generate_204";
-            }
-        });
+        const urlParam = getParameterByName('orig_url');
+        if (urlParam) {
+            document.getElementById('orig_url').value = urlParam;
+        }
 
-        // 4. Handle the Connect Button Click
-        function handleConnect() {
+        function connect() {
             const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
-            const btn = document.getElementById('connectBtn');
-            const btnText = document.getElementById('btnText');
-            const spinner = document.getElementById('btnSpinner');
 
             if (!name || !email) {
-                alert("Please fill in all fields.");
+                alert("Please enter both Name and Email.");
                 return;
             }
 
-            // UI Feedback
-            btn.disabled = true;
-            btnText.style.display = 'none';
-            spinner.style.display = 'block';
+            // 2. Change Button Text
+            document.getElementById('connectBtn').innerText = "Connecting...";
+            document.getElementById('connectBtn').disabled = true;
 
-            // Prepare Data
-            const userData = {
+            // 3. Prepare Data
+            const data = JSON.stringify({
                 name: name,
                 email: email,
-                timestamp: new Date().toISOString(),
-                mac: getParameterByName("client_mac") || "unknown" // Capture MAC if passed in URL
-            };
-
-            // Send to Webhook
-            // We use 'no-cors' mode option if strictly needed, but standard CORS is better for webhook.site
-            fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(userData)
-            })
-            .then(response => {
-                console.log("Data sent successfully");
-            })
-            .catch(error => {
-                console.error("Error sending data", error);
-                // We continue even if error, so the user still gets internet
-            })
-            .finally(() => {
-                // Submit the Auth Form to Aruba
-                document.getElementById('authForm').submit();
+                time: new Date().toISOString()
             });
+
+            // 4. FIRE AND FORGET (navigator.sendBeacon)
+            // This sends data in the background without waiting for a response.
+            // This prevents the "White Screen" if the webhook is blocked or slow.
+            const webhookUrl = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
+            
+            // Try sendBeacon first (best for closing pages), fallback to fetch if needed
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(webhookUrl, data);
+            } else {
+                fetch(webhookUrl, { method: 'POST', body: data, mode: 'no-cors' });
+            }
+
+            // 5. Submit form immediately. Do not wait.
+            document.getElementById('authForm').submit();
         }
     </script>
 </body>
