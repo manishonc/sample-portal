@@ -63,37 +63,46 @@
 </head>
 <body>
     <div class="card">
-        <div id="form-view">
-            <div class="wifi-icon">&#x1F4F6;</div>
-            <h1>Guest WiFi</h1>
-            <p>Enter your name to connect to the internet.</p>
-            <form id="portal-form" onsubmit="return handleConnect()">
-                <input type="text" id="name" placeholder="Your name" required autocomplete="name">
-                <button type="submit">Connect</button>
-            </form>
-        </div>
-        <div id="success-view" class="hidden success">
-            <div class="checkmark">&#x2705;</div>
-            <h1>Connected!</h1>
-            <p id="success-msg">You now have internet access. Enjoy!</p>
-            <div id="ack-container"></div>
-        </div>
+        <script>
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('ack') === '1') {
+                document.write(
+                    '<div class="success">' +
+                        '<div class="checkmark">&#x2705;</div>' +
+                        '<h1>Connected!</h1>' +
+                        '<p>You now have internet access. Enjoy!</p>' +
+                        '<div style="display:none">InstantOn.Acknowledge</div>' +
+                    '</div>'
+                );
+                var redirectUrl = params.get('url');
+                if (redirectUrl) {
+                    document.write('<p style="font-size:14px;color:#666;">Redirecting...</p>');
+                    setTimeout(function() { window.location.href = redirectUrl; }, 3000);
+                }
+            } else {
+                document.write(
+                    '<div>' +
+                        '<div class="wifi-icon">&#x1F4F6;</div>' +
+                        '<h1>Guest WiFi</h1>' +
+                        '<p>Enter your name to connect to the internet.</p>' +
+                        '<form id="portal-form">' +
+                            '<input type="text" id="name" placeholder="Your name" required autocomplete="name">' +
+                            '<button type="submit">Connect</button>' +
+                        '</form>' +
+                    '</div>'
+                );
+            }
+        </script>
     </div>
     <script>
-        function getQueryParam(name) {
-            var params = new URLSearchParams(window.location.search);
-            return params.get(name);
-        }
-        function handleConnect() {
-            document.getElementById('form-view').classList.add('hidden');
-            document.getElementById('success-view').classList.remove('hidden');
-            document.getElementById('ack-container').innerHTML = 'Instant' + 'On.Acknowledge';
-            var redirectUrl = getQueryParam('url');
-            if (redirectUrl) {
-                document.getElementById('success-msg').textContent = 'You are now connected. Redirecting...';
-                setTimeout(function() { window.location.href = redirectUrl; }, 3000);
-            }
-            return false;
+        var form = document.getElementById('portal-form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var params = new URLSearchParams(window.location.search);
+                params.set('ack', '1');
+                window.location.href = window.location.pathname + '?' + params.toString();
+            });
         }
     </script>
 </body>
