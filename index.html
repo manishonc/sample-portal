@@ -3,106 +3,101 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guest WiFi Access</title>
+    <title>Guest WiFi Login</title>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; background-color: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .container { background: white; width: 100%; max-width: 400px; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        button { width: 95%; background-color: #5c0f8b; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
-        button:hover { background-color: #4a0c70; }
-        #status { margin-top: 15px; color: #666; font-size: 13px; min-height: 20px; }
+        body { 
+            margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; 
+        }
+        .container { 
+            background: white; width: 100%; max-width: 360px; padding: 30px; 
+            border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+        }
+        h2 { margin-bottom: 10px; color: #333; }
+        p { color: #666; font-size: 14px; margin-bottom: 20px; }
+        input { 
+            width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; 
+            border-radius: 6px; box-sizing: border-box; font-size: 16px; 
+        }
+        button { 
+            width: 100%; background-color: #5c0f8b; color: white; border: none; 
+            padding: 14px; font-size: 16px; font-weight: bold; border-radius: 6px; 
+            cursor: pointer; margin-top: 15px; 
+        }
+        button:hover { background-color: #400a61; }
+        button:disabled { background-color: #ccc; cursor: default; }
+        #status { margin-top: 15px; font-size: 12px; color: #888; min-height: 18px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>WiFi Login</h2>
-        <p>Please enter your details.</p>
+        <h2>WiFi Access</h2>
+        <p>Enter your details to connect.</p>
         
         <input type="text" id="name" placeholder="Full Name" required>
         <input type="email" id="email" placeholder="Email Address" required>
         
-        <button id="connectBtn" onclick="processLogin()">Connect Internet</button>
+        <button id="connectBtn" onclick="handleLogin()">Connect</button>
         <div id="status"></div>
     </div>
 
     <form id="authForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
+        <input type="hidden" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
         <input type="hidden" name="opcode" value="cp_ack">
-        <input type="hidden" id="orig_url" name="orig_url" value="">
     </form>
 
     <script>
-        // --- CONFIGURATION ---
         const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
-        // Default fallback (Google Check in HEX) if we can't find a real URL
-        const DEFAULT_HEX_URL = "687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034";
 
-        // --- HELPER: Convert Text to Hex ---
-        // Aruba often requires the redirect URL to be encoded in Hex
-        function stringToHex(str) {
-            let hex = '';
-            for(let i = 0; i < str.length; i++) {
-                hex += '' + str.charCodeAt(i).toString(16);
-            }
-            return hex;
-        }
-
-        // --- HELPER: Get URL Parameters ---
-        // External portals often use 'url', 'original_url', or 'orig_url'
-        function getQueryParam(param) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(param);
-        }
-
-        // --- MAIN LOGIC ---
-        function processLogin() {
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const statusDiv = document.getElementById('status');
+        function handleLogin() {
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
             const btn = document.getElementById('connectBtn');
+            const status = document.getElementById('status');
 
             if (!name || !email) {
                 alert("Please fill in all fields.");
                 return;
             }
 
-            // 1. UI Updates
+            // 1. Lock UI
             btn.disabled = true;
             btn.innerText = "Authenticating...";
-            statusDiv.innerText = "Sending data...";
+            status.innerText = "Recording session...";
 
-            // 2. Prepare the Redirect URL (The 'Magic' Fix)
-            const rawUrl = getQueryParam('url') || getQueryParam('orig_url') || getQueryParam('original_url');
-            const authInput = document.getElementById('orig_url');
+            // 2. Prepare Data
+            const userData = JSON.stringify({
+                name: name,
+                email: email,
+                timestamp: new Date().toISOString()
+            });
 
-            if (rawUrl) {
-                // If it looks like http... convert to Hex
-                if (rawUrl.startsWith('http')) {
-                    console.log("Converting URL to Hex...");
-                    authInput.value = stringToHex(rawUrl);
-                } else {
-                    // It's probably already Hex or weird, leave it
-                    authInput.value = rawUrl;
-                }
-            } else {
-                // Fallback to the default Hex string
-                authInput.value = DEFAULT_HEX_URL;
-            }
-
-            // 3. Send Webhook (Fire and Forget)
-            const userData = JSON.stringify({ name: name, email: email, timestamp: new Date().toISOString() });
-            
+            // 3. Send to Webhook (Using sendBeacon for reliability on page unload)
+            // If sendBeacon isn't supported, we fall back to a simple fetch
             if (navigator.sendBeacon) {
                 navigator.sendBeacon(WEBHOOK_URL, userData);
+                submitToAruba();
             } else {
-                fetch(WEBHOOK_URL, { method: 'POST', body: userData, mode: 'no-cors' });
+                fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    body: userData,
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(submitToAruba)
+                .catch(submitToAruba); // Submit even if webhook fails
             }
+        }
 
-            // 4. Submit to Aruba (Small delay to ensure browser processes Beacon)
-            statusDiv.innerText = "Connecting to WiFi...";
+        function submitToAruba() {
+            const status = document.getElementById('status');
+            status.innerText = "Connecting to Internet...";
+            
+            // Small delay to ensure the user sees the status change
             setTimeout(() => {
                 document.getElementById('authForm').submit();
-            }, 300);
+            }, 500);
         }
     </script>
 </body>
