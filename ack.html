@@ -35,10 +35,10 @@
     <div class="card">
         <div class="checkmark">&#x2705;</div>
         <h1>Connected!</h1>
-        <p>You now have internet access.</p>
+        <p>You now have internet access.<br>You can close this page.</p>
     </div>
     <div style="display:none">InstantOn.Acknowledge</div>
-    <div class="version">v1.2.2</div>
+    <div class="version">v1.2.3</div>
     <script>
         var params = new URLSearchParams(window.location.search);
         var guestName = params.get('name') || 'Guest';
@@ -55,16 +55,6 @@
             })
         }).catch(function() {});
 
-        // After AP processes the magic string, trigger OS captive portal check
-        // This tells the CNA (Captive Network Assistant) that auth is done
-        setTimeout(function() {
-            var ua = navigator.userAgent.toLowerCase();
-            if (ua.indexOf('iphone') !== -1 || ua.indexOf('ipad') !== -1 || ua.indexOf('mac') !== -1) {
-                window.location.href = 'http://captive.apple.com/hotspot-detect.html';
-            } else {
-                window.location.href = 'http://connectivitycheck.gstatic.com/generate_204';
-            }
-        }, 2000);
     </script>
 </body>
 </html>
