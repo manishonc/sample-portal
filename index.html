@@ -51,66 +51,28 @@
             transition: background 0.2s;
         }
         button:hover { background: #005bb5; }
-        .success { color: #16a34a; }
-        .success h1 { color: #16a34a; }
-        .checkmark { font-size: 48px; margin-bottom: 16px; }
         .version { position: fixed; bottom: 8px; right: 8px; font-size: 11px; color: #aaa; }
     </style>
 </head>
 <body>
-    <div class="card" id="card"></div>
-    <div class="version">v1.2.0</div>
+    <div class="card">
+        <div class="wifi-icon">&#x1F4F6;</div>
+        <h1>Guest WiFi</h1>
+        <p>Enter your name to connect to the internet.</p>
+        <form id="portal-form">
+            <input type="text" id="name" placeholder="Your name" required autocomplete="name">
+            <button type="submit">Connect</button>
+        </form>
+    </div>
+    <div class="version">v1.2.1</div>
     <script>
-        var params = new URLSearchParams(window.location.search);
-
-        if (params.get('ack') === '1') {
-            // Step 2: User clicked Connect, page reloaded with ack=1
-            // Load ack.html in a hidden iframe so AP sees the magic string
-            // in an HTTP response while browser stays on Portal URL
-            var iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = '/ack.html';
-            document.body.appendChild(iframe);
-
-            var guestName = params.get('name') || 'Guest';
-            document.getElementById('card').innerHTML =
-                '<div class="success">' +
-                    '<div class="checkmark">&#x2705;</div>' +
-                    '<h1>Connected!</h1>' +
-                    '<p>You now have internet access.</p>' +
-                '</div>';
-
-            // Send guest info to webhook (webhook.site is whitelisted)
-            fetch('https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34', {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: guestName,
-                    mac: params.get('mac') || '',
-                    essid: params.get('essid') || '',
-                    timestamp: new Date().toISOString()
-                })
-            }).catch(function() {});
-        } else {
-            // Step 1: Initial portal page — form only, no magic string anywhere
-            document.getElementById('card').innerHTML =
-                '<div class="wifi-icon">&#x1F4F6;</div>' +
-                '<h1>Guest WiFi</h1>' +
-                '<p>Enter your name to connect to the internet.</p>' +
-                '<form id="portal-form">' +
-                    '<input type="text" id="name" placeholder="Your name" required autocomplete="name">' +
-                    '<button type="submit">Connect</button>' +
-                '</form>';
-
-            document.getElementById('portal-form').addEventListener('submit', function(e) {
-                e.preventDefault();
-                var name = document.getElementById('name').value;
-                params.set('ack', '1');
-                params.set('name', name);
-                window.location.href = window.location.pathname + '?' + params.toString();
-            });
-        }
+        document.getElementById('portal-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var name = document.getElementById('name').value;
+            var params = new URLSearchParams(window.location.search);
+            params.set('name', name);
+            window.location.href = '/ack.html?' + params.toString();
+        });
     </script>
 </body>
 </html>
