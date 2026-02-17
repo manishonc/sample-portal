@@ -5,103 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guest WiFi</title>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; background: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .container { background: white; width: 90%; max-width: 360px; padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { margin-bottom: 10px; color: #333; }
-        p { color: #666; font-size: 14px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        
-        /* The Main Connect Button */
-        button { width: 100%; padding: 14px; background: #5c0f8b; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        button:disabled { background: #ccc; }
-        
-        /* The Manual 'Fix It' Button (Hidden by default) */
-        #manualBtn { display: none; background: #28a745; margin-top: 10px; }
+        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background: #eee; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .box { background: white; padding: 25px; border-radius: 12px; text-align: center; width: 90%; max-width: 350px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #333; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; background: #5c0f8b; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:disabled { background: #ccc; cursor: default; }
+        .hidden { display: none !important; }
+        .step-text { margin-bottom: 20px; color: #555; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h2>WiFi Login</h2>
-        <p>Please enter your details.</p>
-        
-        <input type="text" id="name" placeholder="Full Name" required>
-        <input type="email" id="email" placeholder="Email Address" required>
-        
-        <button id="connectBtn" onclick="startLogin()">Connect Internet</button>
-        
-        <form id="manualForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
-            <input type="hidden" name="opcode" value="cp_ack">
-            <input type="hidden" name="ack_redirect" value="1"> <input type="hidden" name="ack_mode" value="1">    <input type="hidden" id="manual_orig_url" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
-            <button id="manualBtn" type="submit">Click here to Finish</button>
-        </form>
-        
-        <div id="status" style="margin-top:15px; font-size:12px; color:#888;"></div>
+    <div class="box">
+        <div id="step1">
+            <h2>WiFi Login</h2>
+            <p class="step-text">Please sign in to connect.</p>
+            <input type="text" id="name" placeholder="Full Name" required>
+            <input type="email" id="email" placeholder="Email Address" required>
+            <button onclick="submitData()" id="btn1">Connect</button>
+        </div>
+
+        <div id="step2" class="hidden">
+            <h2>Access Granted</h2>
+            <p class="step-text">Click the button below to finish.</p>
+            
+            <form id="arubaForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
+                <input type="hidden" name="opcode" value="cp_ack">
+                
+                <input type="hidden" id="final_dest" name="orig_url" value="http://neverssl.com">
+                
+                <button type="submit" style="background-color: #28a745;">Go Online</button>
+            </form>
+        </div>
     </div>
 
     <script>
         const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
 
-        function startLogin() {
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const btn = document.getElementById('connectBtn');
-            const status = document.getElementById('status');
-            const manualBtn = document.getElementById('manualBtn');
-
-            if (!name || !email) {
-                alert("Please fill in all fields");
-                return;
-            }
-
-            // 1. Lock UI
-            btn.disabled = true;
-            btn.innerText = "Authenticating...";
-            status.innerText = "Sending data...";
-
-            // 2. Send Webhook (Fire and Forget)
-            const payload = JSON.stringify({ name: name, email: email, timestamp: new Date().toISOString() });
-            
-            // Use sendBeacon if available (it's faster and doesn't block)
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(WEBHOOK_URL, payload);
-            } else {
-                fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: payload });
-            }
-
-            // 3. SUBMIT TO ARUBA
-            // We wait 1 second to ensure the Webhook fired, then we submit the form.
-            status.innerText = "Connecting to WiFi...";
-            setTimeout(() => {
-                // Try to auto-submit
-                document.getElementById('manualForm').submit();
-                
-                // If the screen stays white or doesn't move after 2 seconds, show the manual button
-                setTimeout(() => {
-                    btn.style.display = 'none';
-                    manualBtn.style.display = 'block';
-                    status.innerText = "If nothing happens, click the green button above.";
-                }, 2000);
-            }, 800);
-        }
-
-        // Setup the Form URL dynamically on load
-        document.addEventListener("DOMContentLoaded", function() {
+        // 1. SETUP ON LOAD
+        window.onload = function() {
             const params = new URLSearchParams(window.location.search);
-            const form = document.getElementById('manualForm');
             
-            // Get the Switch URL from the AP (or use the default one you gave me)
+            // CAPTURE THE 'SWITCH_URL' (This is the AP's internal address)
+            // If the AP provided one, we use it. If not, we keep the default 'captive-2022' one.
             const switchUrl = params.get('switch_url') || params.get('login_url');
             if (switchUrl) {
-                form.action = decodeURIComponent(switchUrl);
+                document.getElementById('arubaForm').action = decodeURIComponent(switchUrl);
             }
 
-            // Get the Original URL (Destination)
-            const origUrl = params.get('orig_url') || params.get('url');
+            // CAPTURE THE USER'S DESTINATION
+            // We default to 'neverssl.com' because it is HTTP and prevents redirect loops.
+            const origUrl = params.get('orig_url') || params.get('url') || params.get('redirect');
             if (origUrl) {
-                document.getElementById('manual_orig_url').value = origUrl;
+                document.getElementById('final_dest').value = origUrl;
             }
-        });
+        };
+
+        function submitData() {
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+
+            if(!name || !email) { alert("Please fill in all fields."); return; }
+
+            // UI Feedback
+            document.getElementById('btn1').innerText = "Verifying...";
+            document.getElementById('btn1').disabled = true;
+
+            // 2. SEND WEBHOOK (Fire and Forget)
+            const data = JSON.stringify({ name: name, email: email, time: new Date().toISOString() });
+            
+            // Use sendBeacon if available (most reliable)
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(WEBHOOK_URL, data);
+            } else {
+                fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: data });
+            }
+
+            // 3. SWITCH TO STEP 2
+            // We reveal the second button. Clicking this manually BYPASSES the "HTTPS->HTTP" security block.
+            setTimeout(() => {
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
+            }, 600);
+        }
     </script>
 </body>
 </html>
