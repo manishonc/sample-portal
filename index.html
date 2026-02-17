@@ -3,15 +3,15 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guest WiFi Access</title>
+    <title>Guest WiFi</title>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; background-color: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .container { background: white; width: 100%; max-width: 360px; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; background: #f4f6f8; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .container { background: white; width: 90%; max-width: 360px; padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h2 { margin-bottom: 10px; color: #333; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; background-color: #5c0f8b; color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 15px; }
-        button:hover { background-color: #400a61; }
-        #debug { margin-top: 20px; font-size: 11px; color: #888; text-align: left; background: #eee; padding: 5px; border-radius: 4px; word-break: break-all; display: none; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; background: #5c0f8b; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        button:disabled { background: #ccc; }
+        #status { margin-top: 15px; font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
@@ -20,86 +20,95 @@
         <h2>WiFi Login</h2>
         <input type="text" id="name" placeholder="Full Name" required>
         <input type="email" id="email" placeholder="Email Address" required>
-        
-        <button id="connectBtn" onclick="handleLogin()">Connect</button>
-        
-        <div id="debug"></div>
+        <button id="connectBtn" onclick="processLogin()">Connect</button>
+        <div id="status"></div>
     </div>
 
-    <form id="authForm" method="POST" action="http://captive-2022.aio.cloudauth.net/swarm.cgi">
-        <input type="hidden" name="opcode" value="cp_ack">
-        <input type="hidden" id="orig_url" name="orig_url" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
-    </form>
+    <input type="hidden" id="fallback_url" value="http://captive-2022.aio.cloudauth.net/swarm.cgi">
+    <input type="hidden" id="fallback_orig" value="687474703a2f2f636f6e6e6563746976697479636865636b2e677374617469632e636f6d2f67656e65726174655f323034">
 
     <script>
-        const WEBHOOK_URL = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
-
-        // 1. SETUP: Check URL for parameters, otherwise use defaults
-        document.addEventListener("DOMContentLoaded", function() {
-            const params = new URLSearchParams(window.location.search);
-            const form = document.getElementById('authForm');
-            const origUrlInput = document.getElementById('orig_url');
-            const debug = document.getElementById('debug');
-
-            // Debug: Show the full URL we are currently on
-            debug.innerText = "Current URL: " + window.location.href;
-
-            // A. CHECK FOR 'switch_url' (The AP Login Server)
-            const switchUrl = params.get('switch_url') || params.get('login_url');
-            if (switchUrl) {
-                form.action = decodeURIComponent(switchUrl);
-                debug.innerHTML += "<br><strong>FOUND SWITCH URL:</strong> " + form.action;
-            } else {
-                debug.innerHTML += "<br><strong>USING FALLBACK URL:</strong> " + form.action;
-            }
-
-            // B. CHECK FOR 'orig_url' (The user's destination)
-            const origUrl = params.get('orig_url') || params.get('url') || params.get('redirect');
-            if (origUrl) {
-                origUrlInput.value = origUrl;
-            }
-        });
-
-        function handleLogin() {
+        function processLogin() {
             const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
             const btn = document.getElementById('connectBtn');
+            const status = document.getElementById('status');
 
             if (!name || !email) {
-                alert("Please fill in all fields.");
+                alert("Please fill in all fields");
                 return;
             }
 
+            // 1. Lock UI
             btn.disabled = true;
-            btn.innerText = "Authenticating...";
+            btn.innerText = "Connecting...";
+            status.innerText = "Registering device...";
 
-            // 2. SEND DATA TO WEBHOOK
-            const userData = JSON.stringify({
+            // 2. Prepare Webhook Data
+            const webhookUrl = "https://webhook.site/6590fb2c-9009-4dd0-9b86-f04b1537ef34";
+            const payload = JSON.stringify({
                 name: name,
                 email: email,
                 timestamp: new Date().toISOString()
             });
 
-            // Try sendBeacon first (best for closing pages), fallback to fetch
+            // 3. Send Webhook (Fire & Forget via sendBeacon)
+            // We do NOT wait for a response. Waiting causes the white screen.
             if (navigator.sendBeacon) {
-                navigator.sendBeacon(WEBHOOK_URL, userData);
-                submitForm();
+                navigator.sendBeacon(webhookUrl, payload);
             } else {
-                fetch(WEBHOOK_URL, {
-                    method: 'POST',
-                    body: userData,
-                    mode: 'no-cors'
-                }).finally(() => {
-                    submitForm();
-                });
+                fetch(webhookUrl, { method: 'POST', mode: 'no-cors', body: payload });
             }
+
+            // 4. FORCE SUBMIT TO ARUBA (After 500ms delay)
+            // This delay is critical to let the browser process the beacon before navigating away.
+            setTimeout(submitToAruba, 500);
         }
 
-        function submitForm() {
-            // 3. SUBMIT TO ARUBA
-            setTimeout(() => {
-                document.getElementById('authForm').submit();
-            }, 500);
+        function submitToAruba() {
+            const params = new URLSearchParams(window.location.search);
+            const status = document.getElementById('status');
+            
+            status.innerText = "Authenticating with WiFi...";
+
+            // GET THE CORRECT URL
+            // Priority 1: URL from AP (switch_url)
+            // Priority 2: Hardcoded Fallback
+            let actionUrl = params.get('switch_url') || params.get('login_url');
+            if (!actionUrl) {
+                actionUrl = document.getElementById('fallback_url').value;
+            } else {
+                actionUrl = decodeURIComponent(actionUrl);
+            }
+
+            // GET THE DESTINATION
+            let origUrl = params.get('orig_url') || params.get('url') || params.get('redirect');
+            if (!origUrl) {
+                origUrl = document.getElementById('fallback_orig').value;
+            }
+
+            // CREATE FORM DYNAMICALLY (To ensure clean submission)
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = actionUrl;
+
+            // Add 'opcode' (Required by Aruba)
+            const opcodeField = document.createElement('input');
+            opcodeField.type = 'hidden';
+            opcodeField.name = 'opcode';
+            opcodeField.value = 'cp_ack';
+            form.appendChild(opcodeField);
+
+            // Add 'orig_url' (Required by Aruba)
+            const origField = document.createElement('input');
+            origField.type = 'hidden';
+            origField.name = 'orig_url';
+            origField.value = origUrl;
+            form.appendChild(origField);
+
+            // Submit
+            document.body.appendChild(form);
+            form.submit();
         }
     </script>
 </body>
