@@ -76,7 +76,7 @@
             <div class="checkmark">&#x2705;</div>
             <h1>Connected!</h1>
             <p id="success-msg">You now have internet access. Enjoy!</p>
-            <div style="display:none">InstantOn.Acknowledge</div>
+            <div id="ack-container"></div>
         </div>
     </div>
     <script>
@@ -87,6 +87,7 @@
         function handleConnect() {
             document.getElementById('form-view').classList.add('hidden');
             document.getElementById('success-view').classList.remove('hidden');
+            document.getElementById('ack-container').innerHTML = 'Instant' + 'On.Acknowledge';
             var redirectUrl = getQueryParam('url');
             if (redirectUrl) {
                 document.getElementById('success-msg').textContent = 'You are now connected. Redirecting...';
